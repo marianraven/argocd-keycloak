@@ -1,0 +1,111 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pgadmin-oidc-env
+  annotations:
+    description: "Inyecta las opciones de configuracion de OAUTH como variables de entorno"
+    fuente: "https://medium.com/@markus.keunecke/how-to-pgadmin-with-open-id-connect-in-docker-compose-fc561b1132c"
+data:
+  config_local.py: |
+    import os
+    clientId = os.path.expandvars('$PGADMIN_OIDC_CLIENT_ID')
+    clientSecret = os.path.expandvars('$PGADMIN_OIDC_CLIENT_SECRET')
+
+    OAUTH2_CONFIG = [
+        {
+            'OAUTH2_NAME': 'KeyCloak',
+            'OAUTH2_DISPLAY_NAME': 'KeyCloak',
+            'OAUTH2_CLIENT_ID': clientId,
+            'OAUTH2_CLIENT_SECRET': clientSecret,
+            'OAUTH2_TOKEN_URL': 'https://sso.localdev.me/auth/realms/dev/protocol/openid-connect/token',
+            'OAUTH2_AUTHORIZATION_URL': 'https://sso.localdev.me/auth/realms/dev/protocol/openid-connect/auth',
+            'OAUTH2_SERVER_METADATA_URL': 'https://sso.localdev.me/auth/realms/dev/.well-known/openid-configuration',
+            'OAUTH2_API_BASE_URL': 'https://sso.localdev.me/auth/realms/dev/',
+            'OAUTH2_USERINFO_ENDPOINT': 'protocol/openid-connect/userinfo',
+            'OAUTH2_SCOPE': 'openid email profile',
+            'OAUTH2_ICON': 'fa-lock',
+            'OAUTH2_BUTTON_COLOR': '#3253a8',
+            'ALLOWED_ORGANIZATIONS': [''],
+            'OAUTH2_SSL_CERT_VERIFICATION': False
+        }
+    ]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pgadmin
+spec:
+  selector:
+    matchLabels:
+      app: keycloak
+      component: pgadmin
+  template:
+    metadata:
+      labels:
+        app: keycloak
+        component: pgadmin
+    spec:
+      hostAliases:
+        - hostnames:
+            - "sso.localdev.me"
+          ip: "192.168.49.2"
+      volumes:
+        - name: pgadmin-oidc
+          configMap:
+            name: pgadmin-oidc-env
+      containers:
+        - name: pgadmin
+          
+          image: dpage/pgadmin4:8
+          envFrom:
+            - configMapRef:
+                name: pgadmin
+            - secretRef:
+                name: pgadmin
+          resources: {}
+          volumeMounts:
+            - name: pgadmin-oidc
+              subPath: config_local.py
+              mountPath: /pgadmin4/config_local.py
+          ports:
+            - containerPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pgadmin
+spec:
+  selector:
+    app: keycloak
+    component: pgadmin
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: pgadmin
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+    cert-manager.io/cluster-issuer: selfsigned-cluster-issuer
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - pgadmin.localdev.me
+      secretName: pgadmin-tls
+  rules:
+    - host: pgadmin.localdev.me
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: pgadmin
+                port:
+                  name: http

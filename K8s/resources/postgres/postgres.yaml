@@ -1,0 +1,77 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: database
+spec:
+  selector:
+    matchLabels:
+      app: keycloak
+      component: database
+  serviceName: database
+  replicas: 1
+  updateStrategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: keycloak
+        component: database
+    spec:
+      containers:
+        - name: database
+          image: postgres:16.1-alpine3.19
+          resources: {}
+          envFrom:
+            - secretRef:
+                name: database
+          ports:
+            - containerPort: 5432
+          volumeMounts:
+            - name: postgredb
+              mountPath: /var/lib/postgresql/data
+          readinessProbe:
+            exec:
+              command:
+              - sh
+              - -c
+              - exec pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 5
+            successThreshold: 1
+            failureThreshold: 6
+          livenessProbe:
+            exec:
+              command:
+              - sh
+              - -c
+              - exec pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            successThreshold: 1
+            failureThreshold: 6
+          
+  volumeClaimTemplates:
+    - metadata:
+        name: postgredb
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: database
+  labels:
+    app: keycloak
+    component: database
+spec:
+  ports:
+  - port: 5432
+    protocol: TCP
+  selector:
+    app: keycloak
+    component: database

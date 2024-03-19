@@ -1,0 +1,167 @@
+args:
+  - 'start-dev'
+  - '--import-realm'
+database:
+  vendor: postgres
+  database: database
+  existingSecret: database
+  existingSecretKey: POSTGRES_PASSWORD
+  url: >-
+    jdbc:postgresql://database:5432/database?ssl=false
+  username: keycloak
+
+image:
+  pullPolicy: IfNotPresent
+  repository: quay.io/keycloak/keycloak
+  tag: '23.0'
+extraEnv: |
+  - name: KC_OVERRIDE
+    value: "true"
+  - name: KEYCLOAK_ADMIN
+    valueFrom:
+      secretKeyRef:
+        name: keycloak-secrets
+        key: KEYCLOAK_ADMIN
+  - name: KEYCLOAK_ADMIN_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: keycloak-secrets
+        key: KEYCLOAK_PASSWORD
+  - name: GF_ADMIN_USERNAME
+    valueFrom:
+      secretKeyRef:
+        name: keycloak-secrets
+        key: GF_ADMIN_USERNAME
+  - name: GF_ADMIN_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: keycloak-secrets
+        key: GF_ADMIN_PASSWORD
+  - name: PGADMIN_OIDC_CLIENT_SECRET
+    valueFrom:
+      secretKeyRef:
+        name: pgadmin
+        key: PGADMIN_OIDC_CLIENT_SECRET
+  - name: KC_REALM_NAME
+    valueFrom:
+      configMapKeyRef:
+        name: keycloak-realm
+        key: KC_REALM_NAME
+  
+  - name: TEST_USER
+    valueFrom:
+      secretKeyRef:
+        name: keycloak-secrets
+        key: TEST_USER
+  - name: TEST_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: keycloak-secrets
+        key: TEST_PASSWORD
+
+  - name: GF_ADMIN_USERNAME
+    valueFrom:
+      secretKeyRef:
+        name: keycloak-secrets
+        key: GF_ADMIN_USERNAME
+  - name: GF_ADMIN_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: keycloak-secrets
+        key: GF_ADMIN_PASSWORD
+  - name: PGADMIN_OIDC_CLIENT_SECRET
+    valueFrom:
+      secretKeyRef:
+        name: pgadmin
+        key: PGADMIN_OIDC_CLIENT_SECRET
+  - name: KC_HOSTNAME_ADMIN
+    value: 'consol.sso.localdev.me'
+  - name: TZ
+    value: America/Buenos_Aires
+extraVolumeMounts: |
+  - name: keycloak-realm-import
+    readOnly: true
+    mountPath: /opt/keycloak/data/import/
+extraVolumes: |
+  - name:  keycloak-realm-import
+    configMap:
+      name: keycloak-realm
+      defaultMode: 420
+
+ingress:
+  annotations: 
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/force-ssl-redirect: 'true'
+    nginx.ingress.kubernetes.io/backend-protocol: 'HTTP'
+    cert-manager.io/cluster-issuer: selfsigned-cluster-issuer
+  console:
+    annotations: 
+      kubernetes.io/ingress.class: nginx
+      nginx.ingress.kubernetes.io/force-ssl-redirect: 'true'
+      nginx.ingress.kubernetes.io/backend-protocol: 'HTTP'
+      cert-manager.io/cluster-issuer: selfsigned-cluster-issuer
+    enabled: true
+    rules:
+      - host: consol.sso.localdev.me
+        paths:
+          - path: '{{ tpl .Values.http.relativePath $ | trimSuffix "/" }}'
+            pathType: Prefix
+    tls:
+    - hosts:
+        - consol.sso.localdev.me
+      secretName: console-sso-tls
+  enabled: true
+  labels: {}
+  rules:
+    - host: sso.localdev.me
+      paths:
+        - path: '{{ tpl .Values.http.relativePath $ | trimSuffix "/" }}/realms'
+          pathType: Prefix
+        - path: '{{ tpl .Values.http.relativePath $ | trimSuffix "/" }}/resources'
+          pathType: Prefix
+        - path: '{{ tpl .Values.http.relativePath $ | trimSuffix "/" }}/js'
+          pathType: Prefix
+        - path: '{{ tpl .Values.http.relativePath $ | trimSuffix "/" }}/robots.txt'
+          pathType: Exact
+        
+  servicePort: http
+  tls:
+    - hosts:
+        - sso.localdev.me
+      secretName: sso-tls
+livenessProbe: |
+  httpGet:
+    path: {{ tpl .Values.http.relativePath $ | trimSuffix "/" }}/health/live
+    port: {{ .Values.service.httpPort }}
+  failureThreshold: 150
+  initialDelaySeconds: 20
+  periodSeconds: 2
+  successThreshold: 1
+  timeoutSeconds: 1
+podSecurityContext:
+  fsGroup: null
+readinessProbe: |
+  httpGet:
+    path: {{ tpl .Values.http.relativePath $ | trimSuffix "/" }}/health/ready
+    port: {{ .Values.service.httpPort }}
+  failureThreshold: 250
+  initialDelaySeconds: 20
+  periodSeconds: 2
+  successThreshold: 1
+  timeoutSeconds: 1
+replicas: 1
+secrets: {}
+securityContext: {}
+serviceAccount: {}
+startupProbe: |
+  httpGet:
+    path: {{ tpl .Values.http.relativePath $ | trimSuffix "/" }}/health/live
+    port: {{ .Values.service.httpPort }}
+  failureThreshold: 150
+  initialDelaySeconds: 20
+  periodSeconds: 2
+  successThreshold: 1
+  timeoutSeconds: 1
+statefulsetLabels:
+  app.kubernetes.io/component: server
+  app.kubernetes.io/part-of: '{{ .Release.Name }}'

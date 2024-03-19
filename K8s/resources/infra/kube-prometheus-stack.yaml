@@ -1,0 +1,33 @@
+grafana:
+  enabled: true
+  image:
+    tag: 10.3.3
+  envFromConfigMaps: 
+    - name: grafana-env
+      optional: false
+  envFromSecret: "grafana-env"
+  
+  hostAliases:
+    - hostnames:
+        - "sso.localdev.me"
+      ip: "192.168.49.2"
+  ingress:
+    enabled: true
+    # For Kubernetes >= 1.18 you should specify the ingress-controller via the field ingressClassName
+    # See https://kubernetes.io/blog/2020/04/02/improvements-to-the-ingress-api-in-kubernetes-1.18/#specifying-the-class-of-an-ingress
+    ingressClassName: nginx
+    # Values can be templated
+    annotations: 
+      kubernetes.io/ingress.class: 'nginx'
+      nginx.ingress.kubernetes.io/force-ssl-redirect: 'false'
+      nginx.ingress.kubernetes.io/backend-protocol: 'HTTP'
+      cert-manager.io/cluster-issuer: selfsigned-cluster-issuer
+    path: /
+    # pathType is only for k8s >= 1.1=
+    pathType: Prefix
+    hosts:
+      - grafana.localdev.me
+    tls:
+    - hosts:
+        - grafana.localdev.me
+      secretName: metrics-grafana-tls

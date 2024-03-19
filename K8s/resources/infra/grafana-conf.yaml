@@ -1,0 +1,43 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-env
+data:
+  TZ: America/Buenos_Aires
+  GF_SERVER_DOMAIN: grafana.localdev.me
+  GF_SERVER_ROOT_URL: https://grafana.localdev.me
+  GF_FEATURE_TOGGLES_ENABLE: flameGraph traceqlSearch correlations traceQLStreaming metricsSummary traceqlEditor
+  
+  # GF_AUTH
+  GF_AUTH_BASIC_ENABLED: "true"
+  GF_AUTH_DISABLE_LOGIN_FORM: "false"
+  # GF_AUTH_GENERIC_OAUTH
+  
+  GF_AUTH_GENERIC_OAUTH_TLS_SKIP_VERIFY_INSECURE: "true"
+  GF_AUTH_GENERIC_OAUTH_ENABLED: "true"
+  GF_AUTH_GENERIC_OAUTH_NAME: "Keycloak"
+  GF_AUTH_GENERIC_OAUTH_ALLOW_SIGN_UP: "true"
+  
+  GF_AUTH_GENERIC_OAUTH_SCOPES: "openid email profile roles"
+  #GF_AUTH_GENERIC_OAUTH_EMAIL_ATTRIBUTE_NAME: "email:primary"
+  
+  GF_AUTH_GENERIC_OAUTH_EMAIL_ATTRIBUTE_PATH : "email"
+  GF_AUTH_GENERIC_OAUTH_LOGIN_ATTRIBUTE_PATH : "username"
+  GF_AUTH_GENERIC_OAUTH_NAME_ATTRIBUTE_PATH : "full_name"
+  GF_AUTH_GENERIC_OAUTH_GROUPS_ATTRIBUTE_PATH : "groups"
+  
+  GF_AUTH_GENERIC_OAUTH_AUTH_URL: https://sso.localdev.me/auth/realms/dev/protocol/openid-connect/auth
+  GF_AUTH_GENERIC_OAUTH_TOKEN_URL: https://sso.localdev.me/auth/realms/dev/protocol/openid-connect/token
+  GF_AUTH_GENERIC_OAUTH_API_URL: https://sso.localdev.me/auth/realms/dev/protocol/openid-connect/userinfo
+  # GF_AUTH_GENERIC_OAUTH_SIGNOUT_REDIRECT_URL: ${KC_HOSTNAME}:${KC_PORT}/realms/${KC_REALM_NAME}/protocol/openid-connect/logout?post_logout_redirect_uri=http%3A%2F%2F%{GF_SERVER_DOMAIN}%3A${GF_SERVER_HTTP_PORT}%2Flogin
+
+  GF_AUTH_GENERIC_OAUTH_ROLE_ATTRIBUTE_PATH: contains(roles[*], 'grafanaadmin') && 'GrafanaAdmin' || contains(roles[*], 'admin') && 'Admin' || contains(roles[*], 'editor') && 'Editor' || 'Viewer'
+  GF_AUTH_GENERIC_OAUTH_ALLOW_ASSIGN_GRAFANA_ADMIN: "true"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: grafana-env
+type: Opaque
+stringData:
+  GF_AUTH_GENERIC_OAUTH_CLIENT_ID: "grafana"
